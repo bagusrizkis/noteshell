@@ -1,0 +1,263 @@
+{
+  "name": "noteshell",
+  "displayName": "Noteshell",
+  "description": "Run bash snippets from README, .sh files, and marker-prefixed comments inline — routed to your existing terminals so env and history are preserved.",
+  "version": "0.1.0",
+  "publisher": "bagus",
+  "engines": {
+    "vscode": "^1.99.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Notebooks",
+    "Other"
+  ],
+  "keywords": [
+    "runner",
+    "shell",
+    "bash",
+    "markdown",
+    "codelens",
+    "repl",
+    "notebook",
+    "terminal",
+    "execute"
+  ],
+  "license": "MIT",
+  "author": {
+    "name": "bagus"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bagusrizkis/noteshell.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bagusrizkis/noteshell/issues"
+  },
+  "homepage": "https://github.com/bagusrizkis/noteshell#readme",
+  "activationEvents": [
+    "onLanguage:markdown",
+    "onLanguage:shellscript",
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "icon": "icon.png",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Running arbitrary shell commands from files is disabled in untrusted workspaces. Code lenses still appear but will refuse to run until you trust the workspace.",
+      "restrictedConfigurations": [
+        "noteshell.commentScanLanguages"
+      ]
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "Noteshell runs commands in a local terminal; virtual workspaces are not supported."
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "noteshell.runAtPosition",
+        "title": "Noteshell: Run Snippet at Position"
+      },
+      {
+        "command": "noteshell.runSelection",
+        "title": "Noteshell: Run Selection"
+      },
+      {
+        "command": "noteshell.pickTerminal",
+        "title": "Noteshell: Pick Terminal for File"
+      },
+      {
+        "command": "noteshell.showOutput",
+        "title": "Noteshell: Show Full Output"
+      },
+      {
+        "command": "noteshell.clearResults",
+        "title": "Noteshell: Clear Results"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "noteshell.runSelection",
+          "when": "editorHasSelection",
+          "group": "noteshell"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "noteshell.runAtPosition",
+          "when": "false"
+        },
+        {
+          "command": "noteshell.showOutput",
+          "when": "false"
+        }
+      ]
+    },
+    "colors": [
+      {
+        "id": "noteshell.successForeground",
+        "description": "Color of the inline summary for a successful run.",
+        "defaults": {
+          "dark": "#73c991",
+          "light": "#388a34",
+          "highContrast": "#89d185"
+        }
+      },
+      {
+        "id": "noteshell.errorForeground",
+        "description": "Color of the inline summary for a failed run.",
+        "defaults": {
+          "dark": "#f48771",
+          "light": "#a1260d",
+          "highContrast": "#f48771"
+        }
+      },
+      {
+        "id": "noteshell.runningForeground",
+        "description": "Color of the inline summary while a run is in progress.",
+        "defaults": {
+          "dark": "#cca700",
+          "light": "#bf8803",
+          "highContrast": "#cca700"
+        }
+      }
+    ],
+    "configuration": {
+      "title": "Noteshell",
+      "properties": {
+        "noteshell.markdownLanguages": {
+          "type": "array",
+          "default": [
+            "bash",
+            "sh",
+            "shell",
+            "console"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "Fenced code block languages that get a Run button in markdown files."
+        },
+        "noteshell.commentScanRequiresInstalledLanguage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Only scan a language's comments when a user-installed extension contributes that language. Blocks scanning when VSCode's built-in grammar is the only source of support (e.g. viewing a .go file without the Go extension)."
+        },
+        "noteshell.commentScanLanguages": {
+          "type": "array",
+          "default": [
+            "python",
+            "javascript",
+            "typescript",
+            "javascriptreact",
+            "typescriptreact",
+            "go",
+            "rust",
+            "ruby",
+            "dockerfile",
+            "makefile",
+            "yaml",
+            "toml"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "Language IDs where comment-marker scanning is enabled. Only comment lines starting with '$ ' or 'run:' become runnable — plain comments never get a Run button. Set to [] to disable entirely."
+        },
+        "noteshell.outputViewer": {
+          "type": "string",
+          "enum": [
+            "log",
+            "terminal"
+          ],
+          "default": "log",
+          "enumDescriptions": [
+            "Open captured output as a read-only log document to the side.",
+            "Open captured output in a webview with xterm.js so ANSI colors are preserved."
+          ],
+          "description": "How to render the full output when you click Show output on a finished block."
+        },
+        "noteshell.ansiInOutput": {
+          "type": "string",
+          "enum": [
+            "strip",
+            "preserve"
+          ],
+          "default": "strip",
+          "description": "Whether to strip ANSI escape sequences from captured output."
+        },
+        "noteshell.confirmBeforeRun": {
+          "type": "string",
+          "enum": [
+            "always",
+            "untrusted",
+            "never"
+          ],
+          "default": "untrusted",
+          "enumDescriptions": [
+            "Always show a modal with the command preview before running.",
+            "Show a modal only when the workspace is untrusted.",
+            "Never show a modal."
+          ],
+          "description": "When to require a confirmation modal before running."
+        },
+        "noteshell.rememberTerminalPerFile": {
+          "type": "boolean",
+          "default": true,
+          "description": "Remember the last terminal you picked for each file and reuse it on the next run."
+        },
+        "noteshell.shellScriptCodeLens": {
+          "type": "string",
+          "enum": [
+            "off",
+            "fileOnly",
+            "perBlock"
+          ],
+          "default": "perBlock",
+          "enumDescriptions": [
+            "No Run buttons in .sh files.",
+            "Single Run button at the top of the file that runs the whole script.",
+            "One Run button above every blank-line-separated logical block."
+          ],
+          "description": "How densely to add Run buttons to shell script files."
+        },
+        "noteshell.outputCapBytes": {
+          "type": "number",
+          "default": 2000000,
+          "minimum": 1024,
+          "description": "Maximum bytes of captured output to keep. Output beyond this is truncated and marked."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "npm run check-types && node esbuild.js --production",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src --ext ts",
+    "vsix": "vsce package",
+    "publish:marketplace": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.99.0",
+    "@vscode/vsce": "^3.9.1",
+    "esbuild": "^0.20.0",
+    "mocha": "^10.3.0",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "@xterm/addon-serialize": "^0.14.0",
+    "@xterm/headless": "^6.0.0"
+  }
+}
