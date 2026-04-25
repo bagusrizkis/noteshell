@@ -3,6 +3,8 @@
 .claude/**
 src/**
 test/**
+.env
+.env.*
 .gitignore
 .gitattributes
 .github/**

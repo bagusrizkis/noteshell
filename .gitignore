@@ -5,3 +5,4 @@ out/
 .vscode-test/
 .claude/
 .DS_Store
+.env

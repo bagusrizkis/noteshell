@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1 — 2026-04-25
+
+- Cleaner extension description on the marketplace listing.
+- Expanded keyword list for marketplace search discovery.
+- `.env` files (and any `.env.*`) excluded from packaged VSIX.
+
 ## 0.1.0 — 2026-04-25
 
 Initial release.

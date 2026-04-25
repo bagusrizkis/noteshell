@@ -1,7 +1,7 @@
 {
   "name": "noteshell",
   "displayName": "Noteshell",
-  "description": "Run bash snippets from README, .sh files, and marker-prefixed comments inline — routed to your existing terminals so env and history are preserved.",
+  "description": "Inline Run buttons for bash snippets in markdown, .sh files, and code comments. Output captured via VSCode shell integration so env, cwd, and history stay intact.",
   "version": "0.1.0",
   "publisher": "bagus",
   "engines": {
@@ -14,14 +14,31 @@
   ],
   "keywords": [
     "runner",
+    "code runner",
     "shell",
+    "shell script",
+    "shellscript",
     "bash",
+    "zsh",
+    "fish",
     "markdown",
+    "readme",
     "codelens",
+    "code lens",
     "repl",
     "notebook",
     "terminal",
-    "execute"
+    "execute",
+    "run",
+    "run code",
+    "run snippet",
+    "snippet",
+    "snippets",
+    "inline run",
+    "inline runner",
+    "shell integration",
+    "playground",
+    "scratchpad"
   ],
   "license": "MIT",
   "author": {
