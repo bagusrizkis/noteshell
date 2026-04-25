@@ -7,10 +7,10 @@ import { renderWithTerminal } from "./results/terminalRender.js";
 import { gateRun } from "./trust.js";
 import { Logger } from "./logger.js";
 
-type TerminalQueue = Promise<void>;
+const HARD_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+const END_EVENT_GRACE_MS = 3000; // After read stream closes, wait 3s for end event.
 
 export class Runner {
-  private readonly queues = new WeakMap<vscode.Terminal, TerminalQueue>();
   private fallbackNoticeShown = false;
 
   constructor(
@@ -37,42 +37,48 @@ export class Runner {
       });
   }
 
-  async run(
-    snippet: Snippet,
-    terminal: vscode.Terminal,
-    docUri: vscode.Uri,
-  ): Promise<void> {
+  async run(snippet: Snippet, terminal: vscode.Terminal, docUri: vscode.Uri): Promise<void> {
     const gate = await gateRun(snippet.commandText);
     if (!gate.ok) {
       this.logger.info(`refused to run ${snippet.id}: ${gate.reason}`);
       return;
     }
 
-    const existing = this.queues.get(terminal) ?? Promise.resolve();
+    const startedAt = Date.now();
     this.store.set({
       snippetId: snippet.id,
-      status: "queued",
+      status: "running",
       output: "",
       rawOutput: "",
       truncated: false,
-      startedAt: Date.now(),
+      startedAt,
       commandText: snippet.commandText,
       docUri: docUri.toString(),
     });
 
-    const next = existing.then(() => this.execute(snippet, terminal));
-    this.queues.set(
-      terminal,
-      next.catch((err) => {
-        this.logger.error(`run ${snippet.id} failed`, err);
-      }),
-    );
-    await next;
+    try {
+      await Promise.race([
+        this.execute(snippet, terminal, startedAt),
+        new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error("run hard-timeout (10 minutes)")), HARD_TIMEOUT_MS),
+        ),
+      ]);
+    } catch (err) {
+      this.logger.error(`run ${snippet.id} failed`, err);
+      const existing = this.store.get(snippet.id);
+      if (existing && (existing.status === "running" || existing.status === "queued")) {
+        this.store.update(snippet.id, {
+          status: "failed",
+          durationMs: Date.now() - startedAt,
+        });
+      }
+    }
   }
 
   private async execute(
     snippet: Snippet,
     terminal: vscode.Terminal,
+    startedAt: number,
   ): Promise<void> {
     const cfg = vscode.workspace.getConfiguration("noteshell");
     const ansiMode = cfg.get<"strip" | "preserve">("ansiInOutput", "strip");
@@ -80,15 +86,10 @@ export class Runner {
 
     terminal.show(true);
 
-    const startedAt = Date.now();
-    this.store.update(snippet.id, { status: "running", startedAt });
-
     const si = await waitForShellIntegration(terminal);
     if (!si) {
       this.logger.warn(
-        `shell integration not available on terminal '${terminal.name}' within 3s — falling back to sendText. ` +
-        `Check: (1) VSCode >= 1.99, (2) terminal.integrated.shellIntegration.enabled = true, ` +
-        `(3) your shell is bash/zsh/fish/pwsh with auto-injection working.`,
+        `shell integration not available on terminal '${terminal.name}' within 3s — falling back to sendText.`,
       );
       this.maybeNotifyFallback();
       terminal.sendText(snippet.commandText, true);
@@ -114,12 +115,22 @@ export class Runner {
       return;
     }
 
-    const readPromise = this.readStream(execution, cap);
-    const endPromise = this.awaitEnd(execution);
+    // Subscribe to end events BEFORE awaiting the read stream so we don't miss
+    // events that fire during the stream. Match by reference; multi-line
+    // commands fire one end event per sub-execution but the API contract is
+    // that we get back at least one matching the returned `execution`.
+    const endPromise = this.awaitEnd(execution, terminal);
+    const rawOutput = await this.readStream(execution, cap);
 
-    const [rawOutput, endEvent] = await Promise.all([readPromise, endPromise]);
+    // After the read stream closes, give the end event a short grace window.
+    // If it never fires (multi-line / bug), proceed with unknown exit code so
+    // the snippet doesn't stay stuck on "running" forever.
+    const endEvent = await Promise.race([
+      endPromise,
+      new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), END_EVENT_GRACE_MS)),
+    ]);
+
     const duration = Date.now() - startedAt;
-
     const truncated = rawOutput.length >= cap;
     const rawFinal = truncated ? rawOutput.slice(0, cap) : rawOutput;
     const output =
@@ -129,14 +140,13 @@ export class Runner {
     const exitCode = endEvent?.exitCode;
 
     const patch: Partial<ExecutionResult> = {
-      status: exitCode === 0 || exitCode === undefined ? "done" : "failed",
+      status: exitCode === undefined || exitCode === 0 ? "done" : "failed",
       exitCode,
       output,
       rawOutput: rawFinal,
       durationMs: duration,
       truncated,
     };
-    if (exitCode !== undefined && exitCode !== 0) patch.status = "failed";
     this.store.update(snippet.id, patch);
   }
 
@@ -169,13 +179,32 @@ export class Runner {
     return chunks.join("");
   }
 
-  private awaitEnd(execution: vscode.TerminalShellExecution): Promise<vscode.TerminalShellExecutionEndEvent | undefined> {
+  private awaitEnd(
+    execution: vscode.TerminalShellExecution,
+    terminal: vscode.Terminal,
+  ): Promise<vscode.TerminalShellExecutionEndEvent | undefined> {
     return new Promise((resolve) => {
+      let lastTerminalEvent: vscode.TerminalShellExecutionEndEvent | undefined;
       const sub = vscode.window.onDidEndTerminalShellExecution((e) => {
-        if (e.execution !== execution) return;
-        sub.dispose();
-        resolve(e);
+        // Strict reference match — preferred.
+        if (e.execution === execution) {
+          sub.dispose();
+          resolve(e);
+          return;
+        }
+        // Fallback: track end events from same terminal so we have *something*
+        // to use if the strict match never lands (compound command / sub-execution
+        // reference mismatch). The grace-window race in execute() resolves with
+        // undefined first if no strict match arrives; we just keep this around
+        // for diagnostic completeness.
+        if (e.terminal === terminal) {
+          lastTerminalEvent = e;
+        }
       });
+      // Diagnostic only — no resolve from fallback path. The grace-window race
+      // in execute() handles unblocking. We just log if a same-terminal event
+      // arrived but no strict match did.
+      void lastTerminalEvent;
     });
   }
 }

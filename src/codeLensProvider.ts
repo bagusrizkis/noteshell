@@ -129,21 +129,45 @@ export class NoteshellCodeLensProvider implements vscode.CodeLensProvider, vscod
 
   provideCodeLenses(doc: vscode.TextDocument): vscode.CodeLens[] {
     const snippets = this.parseIfNeeded(doc);
+    const activeSelection = this.activeSelectionFor(doc);
+
     const lenses: vscode.CodeLens[] = [];
     for (const s of snippets) {
       const range = new vscode.Range(s.range.startLine, 0, s.range.startLine, 0);
+
+      // If the user's selection intersects this block, transform the Run lens
+      // into "Run selection" so the same button does what the user expects.
+      const intersectsSelection =
+        activeSelection !== undefined &&
+        activeSelection.endLine >= s.range.startLine &&
+        activeSelection.startLine <= s.range.endLine;
+
+      if (intersectsSelection && activeSelection) {
+        lenses.push(
+          new vscode.CodeLens(range, {
+            title: "$(play) Run selection",
+            command: "noteshell.runSelection",
+            arguments: [doc.uri, activeSelection],
+          }),
+        );
+      } else {
+        lenses.push(
+          new vscode.CodeLens(range, {
+            title: this.titleFor(s),
+            command: "noteshell.runAtPosition",
+            arguments: [doc.uri, s.id],
+          }),
+        );
+      }
+
       lenses.push(
-        new vscode.CodeLens(range, {
-          title: this.titleFor(s),
-          command: "noteshell.runAtPosition",
-          arguments: [doc.uri, s.id],
-        }),
         new vscode.CodeLens(range, {
           title: "$(arrow-swap) Switch terminal",
           command: "noteshell.pickTerminal",
           arguments: [doc.uri],
         }),
       );
+
       const result = this.store.get(s.id);
       if (result && (result.status === "done" || result.status === "failed")) {
         lenses.push(
@@ -156,16 +180,17 @@ export class NoteshellCodeLensProvider implements vscode.CodeLensProvider, vscod
       }
     }
 
-    const selectionLens = this.selectionLensFor(doc, snippets);
-    if (selectionLens) lenses.push(selectionLens);
-
     return lenses;
   }
 
-  private selectionLensFor(
+  /**
+   * Return the editor selection range relevant for "run selection" — only when
+   * non-empty, non-whitespace, and inside a shell context (.sh or a
+   * shell-fenced markdown block). Returns undefined otherwise.
+   */
+  private activeSelectionFor(
     doc: vscode.TextDocument,
-    snippets: Snippet[],
-  ): vscode.CodeLens | undefined {
+  ): { startLine: number; endLine: number; startCol: number; endCol: number } | undefined {
     const editor = vscode.window.visibleTextEditors.find(
       (e) => e.document.uri.toString() === doc.uri.toString(),
     );
@@ -175,26 +200,23 @@ export class NoteshellCodeLensProvider implements vscode.CodeLensProvider, vscod
     if (doc.getText(sel).trim().length === 0) return undefined;
 
     const langId = doc.languageId;
-    if (langId === "shellscript") {
-      // allow
-    } else if (langId === "markdown") {
-      // Only show when selection is inside a parsed shell-fenced block.
+    if (langId !== "shellscript" && langId !== "markdown") return undefined;
+
+    if (langId === "markdown") {
+      const snippets = this.parseIfNeeded(doc);
       const insideFence = snippets.some(
         (s) =>
           sel.start.line >= s.range.startLine && sel.end.line <= s.range.endLine,
       );
       if (!insideFence) return undefined;
-    } else {
-      return undefined;
     }
 
-    const anchorLine = sel.start.line;
-    const range = new vscode.Range(anchorLine, 0, anchorLine, 0);
-    return new vscode.CodeLens(range, {
-      title: "$(play) Run selection",
-      command: "noteshell.runSelection",
-      arguments: [],
-    });
+    return {
+      startLine: sel.start.line,
+      endLine: sel.end.line,
+      startCol: sel.start.character,
+      endCol: sel.end.character,
+    };
   }
 
   private titleFor(snippet: Snippet): string {

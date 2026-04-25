@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2 — 2026-04-25
+
+- Fix Run selection lens not running when clicked. CodeLens click was collapsing the editor selection; the lens now passes the captured selection range as a command argument.
+- Fix runs getting stuck on "Queued" forever for multi-line commands. Removed the per-terminal queue chain (terminal serializes naturally). Added a grace-window + hard timeout so a missed end event no longer hangs the run.
+
 ## 0.1.1 — 2026-04-25
 
 - Cleaner extension description on the marketplace listing.

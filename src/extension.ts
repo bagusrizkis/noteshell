@@ -61,30 +61,52 @@ export function activate(context: vscode.ExtensionContext): void {
       },
     ),
 
-    vscode.commands.registerCommand("noteshell.runSelection", async () => {
-      const editor = vscode.window.activeTextEditor;
-      if (!editor) return;
-      const sel = editor.selection;
-      if (sel.isEmpty) {
-        vscode.window.showInformationMessage("Noteshell: no selection.");
-        return;
-      }
-      const text = editor.document.getText(sel);
-      const snippet = buildSelectionSnippet(
-        text,
-        {
-          startLine: sel.start.line,
-          endLine: sel.end.line,
-          startCol: sel.start.character,
-          endCol: sel.end.character,
-        },
-        editor.document.uri.toString(),
-      );
-      if (!snippet) return;
-      const terminal = await resolveTerminal(editor.document.uri);
-      if (!terminal) return;
-      await runner.run(snippet, terminal, editor.document.uri);
-    }),
+    vscode.commands.registerCommand(
+      "noteshell.runSelection",
+      async (
+        uri?: vscode.Uri,
+        rangeArg?: { startLine: number; endLine: number; startCol?: number; endCol?: number },
+      ) => {
+        let docUri: vscode.Uri;
+        let text: string;
+        let snippetRange: { startLine: number; endLine: number; startCol?: number; endCol?: number };
+
+        if (uri && rangeArg) {
+          // Invoked from CodeLens with the range captured at render-time.
+          const doc = await vscode.workspace.openTextDocument(uri);
+          const start = new vscode.Position(rangeArg.startLine, rangeArg.startCol ?? 0);
+          const endLine = doc.lineAt(Math.min(rangeArg.endLine, doc.lineCount - 1));
+          const endCol = rangeArg.endCol ?? endLine.range.end.character;
+          const end = new vscode.Position(rangeArg.endLine, endCol);
+          text = doc.getText(new vscode.Range(start, end));
+          docUri = uri;
+          snippetRange = rangeArg;
+        } else {
+          // Invoked from command palette / context menu — use active selection.
+          const editor = vscode.window.activeTextEditor;
+          if (!editor) return;
+          const sel = editor.selection;
+          if (sel.isEmpty) {
+            vscode.window.showInformationMessage("Noteshell: no selection.");
+            return;
+          }
+          text = editor.document.getText(sel);
+          docUri = editor.document.uri;
+          snippetRange = {
+            startLine: sel.start.line,
+            endLine: sel.end.line,
+            startCol: sel.start.character,
+            endCol: sel.end.character,
+          };
+        }
+
+        const snippet = buildSelectionSnippet(text, snippetRange, docUri.toString());
+        if (!snippet) return;
+        const terminal = await resolveTerminal(docUri);
+        if (!terminal) return;
+        await runner.run(snippet, terminal, docUri);
+      },
+    ),
 
     vscode.commands.registerCommand("noteshell.pickTerminal", async (uri?: vscode.Uri) => {
       const targetUri = uri ?? vscode.window.activeTextEditor?.document.uri;

@@ -22,16 +22,17 @@ export class TerminalMemento {
 
   async recall(uri: vscode.Uri): Promise<vscode.Terminal | undefined> {
     const stored = this.state.get<StoredTerminal>(this.keyFor(uri));
-    if (!stored) return undefined;
+    if (!stored || stored.processId === undefined) return undefined;
     const terminals = vscode.window.terminals;
 
-    if (stored.processId !== undefined) {
-      for (const t of terminals) {
-        const pid = await Promise.resolve(t.processId).catch(() => undefined);
-        if (pid === stored.processId) return t;
-      }
+    for (const t of terminals) {
+      const pid = await Promise.resolve(t.processId).catch(() => undefined);
+      if (pid === stored.processId) return t;
     }
-    return terminals.find((t) => t.name === stored.name);
+    // Stored processId no longer matches any live terminal (different session,
+    // closed, restarted). Drop the stale entry so the next call prompts fresh.
+    void this.state.update(this.keyFor(uri), undefined);
+    return undefined;
   }
 
   forget(uri: vscode.Uri): Thenable<void> {

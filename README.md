@@ -2,6 +2,8 @@
 
 Run bash snippets inline (from markdown, `.sh` scripts, and marker-prefixed comments) in existing terminals so environment, `cd` state, and history stay intact.
 
+![demo](docs/assets/demo.gif)
+
 ## What it does
 
 - **Markdown**: every ```` ```bash ```` / ```` ```sh ```` / ```` ```shell ```` / ```` ```console ```` block gets a `▶ Run` CodeLens. In `console` blocks only `$ `-prefixed lines are runnable; `> ` continuation lines fold into the same command.
