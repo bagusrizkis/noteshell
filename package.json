@@ -2,7 +2,7 @@
   "name": "noteshell",
   "displayName": "Noteshell",
   "description": "Inline Run buttons for bash snippets in markdown, .sh files, and code comments. Output captured via VSCode shell integration so env, cwd, and history stay intact.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "bagus",
   "engines": {
     "vscode": "^1.99.0"
