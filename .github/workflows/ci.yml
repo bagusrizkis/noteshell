@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run check-types
+
+      - name: Build
+        run: node esbuild.js --production
+
+      - name: Package VSIX (dry-run)
+        run: npx vsce package --no-git-tag-version --out noteshell-ci.vsix
+
+      - name: Upload VSIX as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: noteshell-vsix
+          path: noteshell-ci.vsix
+          retention-days: 7
