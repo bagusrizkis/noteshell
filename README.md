@@ -1,6 +1,12 @@
 # Noteshell
 
+[![VSCode Marketplace](https://img.shields.io/visual-studio-marketplace/v/bagus.noteshell?label=marketplace&color=0066b8)](https://marketplace.visualstudio.com/items?itemName=bagus.noteshell)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/bagus.noteshell)](https://marketplace.visualstudio.com/items?itemName=bagus.noteshell)
+[![Rating](https://img.shields.io/visual-studio-marketplace/r/bagus.noteshell)](https://marketplace.visualstudio.com/items?itemName=bagus.noteshell)
+
 Run bash snippets inline (from markdown, `.sh` scripts, and marker-prefixed comments) in existing terminals so environment, `cd` state, and history stay intact.
+
+**Install**: [marketplace.visualstudio.com/items?itemName=bagus.noteshell](https://marketplace.visualstudio.com/items?itemName=bagus.noteshell) · `code --install-extension bagus.noteshell`
 
 ![demo](docs/assets/demo.gif)
 
